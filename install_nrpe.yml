@@ -1,0 +1,122 @@
+---
+- name: Install NRPE and Nagios Plugins
+  hosts: all
+  become: yes
+  vars:
+    packages_redhat:
+      - gcc
+      - glibc
+      - glibc-common
+      - openssl-devel
+      - make
+      - wget
+      - automake
+      - tar
+    packages_debian:
+      - gcc
+      - libc6
+      - libc6-dev
+      - libssl-dev
+      - make
+      - wget
+      - automake
+      - tar
+  tasks:
+    - name: Install required packages on RedHat-based systems
+      package:
+        name: "{{ packages_redhat }}"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install required packages on Debian-based systems
+      package:
+        name: "{{ packages_debian }}"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create /usr/src directory if it doesn't exist
+      file:
+        path: /usr/src
+        state: directory
+        mode: '0755'
+
+    - name: Download NRPE source code
+      get_url:
+        url: https://github.com/NagiosEnterprises/nrpe/releases/download/nrpe-4.1.1/nrpe-4.1.1.tar.gz
+        dest: /usr/src/nrpe-4.1.1.tar.gz
+
+    - name: Extract NRPE source code
+      unarchive:
+        src: /usr/src/nrpe-4.1.1.tar.gz
+        dest: /usr/src/
+        remote_src: yes
+
+    - name: Compile and install NRPE
+      shell: |
+        ./configure
+        make all
+        make install-groups-users
+        make install
+        make install-config
+        make install-init
+      args:
+        chdir: /usr/src/nrpe-4.1.1
+
+    - name: Download Nagios Plugins
+      get_url:
+        url: https://github.com/nagios-plugins/nagios-plugins/archive/release-2.4.1.tar.gz
+        dest: /usr/src/release-2.4.1.tar.gz
+
+    - name: Extract Nagios Plugins
+      unarchive:
+        src: /usr/src/release-2.4.1.tar.gz
+        dest: /usr/src/
+        remote_src: yes
+
+    - name: Compile and install Nagios Plugins
+      shell: |
+        ./tools/setup
+        ./configure
+        make
+        make install
+      args:
+        chdir: /usr/src/nagios-plugins-release-2.4.1
+
+    - name: Enable and start NRPE service
+      service:
+        name: nrpe
+        enabled: yes
+        state: started
+
+    - name: Clean up NRPE source files
+      file:
+        path: /usr/src/nrpe-4.1.1
+        state: absent
+
+    - name: Clean up Nagios Plugins source files
+      file:
+        path: /usr/src/nagios-plugins-release-2.4.1
+        state: absent
+
+    - name: Remove NRPE tarball
+      file:
+        path: /usr/src/nrpe-4.1.1.tar.gz
+        state: absent
+
+    - name: Remove Nagios Plugins tarball
+      file:
+        path: /usr/src/release-2.4.1.tar.gz
+        state: absent
+
+    - name: Copy nrpe.cfg to /usr/local/nagios/etc/nrpe.cfg
+      copy:
+        src: nrpe.cfg
+        dest: /usr/local/nagios/etc/nrpe.cfg
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart NRPE service
+      service:
+        name: nrpe
+        state: restarted
