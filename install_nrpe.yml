@@ -12,6 +12,7 @@
       - wget
       - automake
       - tar
+      - bc
     packages_debian:
       - gcc
       - libc6
@@ -21,6 +22,7 @@
       - wget
       - automake
       - tar
+      - bc
   tasks:
     - name: Install required packages on RedHat-based systems
       package:
